@@ -1,5 +1,5 @@
 // This #include statement was automatically added by the Spark IDE.
-#include "../includes/Barometer.h"
+#include "Barometer.h"
 
 #define AIRQUALITY A0
 
