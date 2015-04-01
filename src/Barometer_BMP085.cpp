@@ -31,7 +31,7 @@
  * THE SOFTWARE.
  */
 
-#include "Barometer.h"
+#include "Barometer_BMP085.h"
 
 #ifndef SPARK
 #include <Wire.h>
@@ -40,35 +40,48 @@
 
 void Barometer::init(void)
 {
-    Wire.begin();
-    Serial.print("Temperaturet: ");
-    ac1 = bmp085ReadInt(0xAA);
-    ac2 = bmp085ReadInt(0xAC);
-    ac3 = bmp085ReadInt(0xAE);
-    ac4 = bmp085ReadInt(0xB0);
-    ac5 = bmp085ReadInt(0xB2);
-    ac6 = bmp085ReadInt(0xB4);
-    b1 = bmp085ReadInt(0xB6);
-    b2 = bmp085ReadInt(0xB8);
-    mb = bmp085ReadInt(0xBA);
-    mc = bmp085ReadInt(0xBC);
-    md = bmp085ReadInt(0xBE);
-    Serial.print("Temperaturet2: ");
-}
+  byte error;
+  Wire.begin();
+  if (Wire.endTransmission() == 0)
+    {
+      Serial.print("Temperaturet: ");
+      ac1 = bmp085ReadInt(0xAA);
+      ac2 = bmp085ReadInt(0xAC);
+      ac3 = bmp085ReadInt(0xAE);
+      ac4 = bmp085ReadInt(0xB0);
+      ac5 = bmp085ReadInt(0xB2);
+      ac6 = bmp085ReadInt(0xB4);
+      b1 = bmp085ReadInt(0xB6);
+      b2 = bmp085ReadInt(0xB8);
+      mb = bmp085ReadInt(0xBA);
+      mc = bmp085ReadInt(0xBC);
+      md = bmp085ReadInt(0xBE);
+      Serial.print("Temperaturet2: ");
+    }
+  }
 
 // Read 1 byte from the BMP085 at 'address'
 // Return: the read byte;
 char Barometer::bmp085Read(unsigned char address)
 {
-    //Wire.begin();
-    unsigned char data;
-    Wire.beginTransmission(BMP085_ADDRESS);
-    Wire.write(address);
-    Wire.endTransmission();
+  unsigned int retries = 0;
+  unsigned char data;
+  Wire.beginTransmission(BMP085_ADDRESS);
+  Wire.write(address);
+  error = Wire.endTransmission();
 
-    Wire.requestFrom(BMP085_ADDRESS, 1);
-    while(!Wire.available());
-    return Wire.read();
+  if (error == 0)
+    {
+      Wire.requestFrom(BMP085_ADDRESS, 1);
+      while(!Wire.available() && retries < BMP085_TIMEOUT)
+      {
+          delay(1);
+          retries++;
+      }
+      return Wire.read();
+    } else {
+      return (char)0;
+    }
 }
 
 // Read 2 bytes from the BMP085
@@ -76,27 +89,40 @@ char Barometer::bmp085Read(unsigned char address)
 // Second byte will be from 'address'+1
 short Barometer::bmp085ReadInt(unsigned char address)
 {
+    unsigned int retries = 0;
     unsigned char msb, lsb;
     Wire.beginTransmission(BMP085_ADDRESS);
     Wire.write(address);
-    Wire.endTransmission();
-    Wire.requestFrom(BMP085_ADDRESS, 2);
-    while(Wire.available()<2);
-    msb = Wire.read();
-    lsb = Wire.read();
-    return (short) msb<<8 | lsb;
+    error = Wire.endTransmission();
+    if (error == 0)
+    {
+        Wire.requestFrom(BMP085_ADDRESS, 2);
+        while(!Wire.available() < 2 && retries < BMP085_TIMEOUT)
+          {
+              delay(1);
+              retries++;
+          }
+        msb = Wire.read();
+        lsb = Wire.read();
+        return (short) msb<<8 | lsb;
+    } else {
+        return (short)0;
+    }
 }
 
 // Read the uncompensated temperature value
 unsigned short Barometer::bmp085ReadUT()
 {
-    unsigned short ut;
+    unsigned short ut = 0;
     Wire.beginTransmission(BMP085_ADDRESS);
     Wire.write(0xF4);
     Wire.write(0x2E);
-    Wire.endTransmission();
-    delay(5);
-    ut = bmp085ReadInt(0xF6);
+    error = Wire.endTransmission();
+    if (error == 0)
+    {
+        delay(5);
+        ut = bmp085ReadInt(0xF6);
+    }
     return ut;
 }
 // Read the uncompensated pressure value
@@ -107,14 +133,17 @@ unsigned long Barometer::bmp085ReadUP()
     Wire.beginTransmission(BMP085_ADDRESS);
     Wire.write(0xF4);
     Wire.write(0x34 + (OSS<<6));
-    Wire.endTransmission();
-    delay(2 + (3<<OSS));
+    error = Wire.endTransmission();
+    if (error == 0)
+    {
+        delay(2 + (3<<OSS));
 
-    // Read register 0xF6 (MSB), 0xF7 (LSB), and 0xF8 (XLSB)
-    msb = bmp085Read(0xF6);
-    lsb = bmp085Read(0xF7);
-    xlsb = bmp085Read(0xF8);
-    up = (((unsigned long) msb << 16) | ((unsigned long) lsb << 8) | (unsigned long) xlsb) >> (8-OSS);
+        // Read register 0xF6 (MSB), 0xF7 (LSB), and 0xF8 (XLSB)
+        msb = bmp085Read(0xF6);
+        lsb = bmp085Read(0xF7);
+        xlsb = bmp085Read(0xF8);
+        up = (((unsigned long) msb << 16) | ((unsigned long) lsb << 8) | (unsigned long) xlsb) >> (8-OSS);
+    }
     return up;
 }
 
@@ -128,18 +157,23 @@ void Barometer::writeRegister(short deviceAddress, byte address, byte val)
 
 short Barometer::readRegister(short deviceAddress, byte address)
 {
-    short v;
+    short v = 0;
+    unsigned int retries = 0;
     Wire.beginTransmission(deviceAddress);
     Wire.write(address); // register to read
-    Wire.endTransmission();
+    error = Wire.endTransmission();
+    if (error == 0)
+    {
+        Wire.requestFrom(deviceAddress, 1); // read a byte
 
-    Wire.requestFrom(deviceAddress, 1); // read a byte
+        while(!Wire.available() && retries < BMP085_TIMEOUT)
+        {
+            delay(1);
+            retries++;
+        }
 
-    while(!Wire.available()) {
-        // waiting
+        v = Wire.read();
     }
-
-    v = Wire.read();
     return v;
 }
 

@@ -1,26 +1,37 @@
 // This #include statement was automatically added by the Spark IDE.
-#include "Barometer.h"
+#include "Barometer_BMP085.h"
 
 #define AIRQUALITY A0
 
-float temperature, pressure, atm, altitude, airquality;
+float temperature=0, pressure=0, atm=0, altitude=0;
+unsigned int airquality=0;
 Barometer myBarometer;
 
 void setup(){
   Serial.begin(9600);
+
+  #ifdef BAROMETER_BMP085
   myBarometer.init();
-  Spark.variable("temperature", &temperature, DOUBLE);
+  Spark.variable("temp", &temperature, DOUBLE);
   Spark.variable("pressure", &pressure, INT);
-  Spark.variable("airquality", &airquality, DOUBLE);
+  #endif
+
+  Spark.variable("airquality", &airquality, INT);
+
   pinMode(AIRQUALITY, INPUT);
 }
 
 void loop()
 {
+#ifdef BAROMETER_BMP085
    temperature = myBarometer.bmp085GetTemperature(myBarometer.bmp085ReadUT()); //Get the temperature, bmp085ReadUT MUST be called first
    pressure = myBarometer.bmp085GetPressure(myBarometer.bmp085ReadUP());//Get the temperature
    altitude = myBarometer.calcAltitude(pressure); //Uncompensated caculation - in Meters
    atm = pressure / 101325;
+#else
+  temperature = 0;
+  pressure = 0;
+#endif
 
   Serial.print("Temperature: ");
   Serial.print(temperature, 2); //display 2 decimal places

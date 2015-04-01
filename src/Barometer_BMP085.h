@@ -46,6 +46,7 @@
 
 const unsigned char OSS = 0;
 #define BMP085_ADDRESS 0x77
+#define BMP085_TIMEOUT 100 // 100ms timeout
 
 class Barometer
 {
@@ -57,6 +58,7 @@ class Barometer
     float calcAltitude(float pressure);
     unsigned short bmp085ReadUT(void);
     unsigned long bmp085ReadUP(void);
+    byte error;
 
     private:
 
